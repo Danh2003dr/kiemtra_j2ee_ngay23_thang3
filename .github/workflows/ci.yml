@@ -84,20 +84,22 @@ jobs:
     steps:
       - name: Triển khai lên DevOps Classroom
         run: |
+          REPO="danh1432/lehoangdanh-courseapp"
           set +e
-          RESPONSE=$(curl -sS -w "\n%{http_code}" --max-time 60 -X POST "${{ secrets.DEPLOY_URL }}")
+          RESPONSE=$(curl -sS -w "\n%{http_code}" --max-time 60 -X POST "${{ secrets.DEPLOY_URL }}?repo=$REPO&tag=latest")
           CURL_EXIT=$?
           set -e
-
-          if [ "$CURL_EXIT" -eq 52 ] || [ "$CURL_EXIT" -eq 0 ]; then
-            BODY=$(echo "$RESPONSE" | sed '$d')
-            CODE=$(echo "$RESPONSE" | tail -n1)
-            echo "Webhook HTTP: ${CODE:-N/A} (curl exit: $CURL_EXIT)"
-            echo "::group::Chi tiết webhook JSON"
-            echo "$BODY" | python3 -m json.tool 2>/dev/null || echo "${BODY:-<empty - server closed connection, deploy may be async>}"
-            echo "::endgroup::"
-            echo "Webhook đã được gửi — kiểm tra dashboard trường để xem kết quả."
-          else
-            echo "Lỗi curl: $CURL_EXIT"
-            exit 1
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          CODE=$(echo "$RESPONSE" | tail -n1)
+          echo "Webhook HTTP: ${CODE:-N/A} (curl exit: $CURL_EXIT)"
+          if [ "$CURL_EXIT" -ne 0 ] && [ "$CURL_EXIT" -ne 52 ]; then
+            echo "Lỗi curl: $CURL_EXIT"; exit 1
           fi
+          if [ -n "$CODE" ] && [ "$CODE" -ge 200 ] && [ "$CODE" -lt 300 ]; then
+            echo "Deploy thành công."
+          else
+            echo "Deploy thất bại. Xem chi tiết trong nhóm log bên dưới."
+          fi
+          echo "::group::Chi tiết webhook JSON"
+          echo "$BODY" | python3 -m json.tool 2>/dev/null || echo "${BODY:-<server closed connection - deploy may be async>}"
+          echo "::endgroup::"
