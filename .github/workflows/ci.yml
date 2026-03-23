@@ -1,4 +1,4 @@
-name: CI / CD
+﻿name: CI / CD
 
 on:
   push:
@@ -93,13 +93,24 @@ jobs:
           CODE=$(echo "$RESPONSE" | tail -n1)
           echo "Webhook HTTP: ${CODE:-N/A} (curl exit: $CURL_EXIT)"
           if [ "$CURL_EXIT" -ne 0 ] && [ "$CURL_EXIT" -ne 52 ]; then
-            echo "Lỗi curl: $CURL_EXIT"; exit 1
-          fi
-          if [ -n "$CODE" ] && [ "$CODE" -ge 200 ] && [ "$CODE" -lt 300 ]; then
-            echo "Deploy thành công."
-          else
-            echo "Deploy thất bại. Xem chi tiết trong nhóm log bên dưới."
+            echo "Lỗi curl: $CURL_EXIT"
+            exit 1
           fi
           echo "::group::Chi tiết webhook JSON"
           echo "$BODY" | python3 -m json.tool 2>/dev/null || echo "${BODY:-<server closed connection - deploy may be async>}"
           echo "::endgroup::"
+
+      - name: Health check ứng dụng sau deploy
+        run: |
+          APP_URL="http://157.20.82.3:21010/courses"
+          echo "Kiểm tra health URL: $APP_URL"
+          for i in {1..18}; do
+            if curl -fsS --max-time 8 "$APP_URL" >/dev/null; then
+              echo "Ứng dụng đã lên thành công (attempt $i)."
+              exit 0
+            fi
+            echo "Chưa lên (attempt $i/18), đợi 5s..."
+            sleep 5
+          done
+          echo "Health check thất bại: app chưa sẵn sàng sau 90s."
+          exit 1
