@@ -21,9 +21,9 @@ USER spring
 
 COPY --from=builder /workspace/target/*.jar app.jar
 
-EXPOSE 80
+EXPOSE 8080
 
 ENTRYPOINT ["java", \
   "-Djava.security.egd=file:/dev/./urandom", \
-  "-DSERVER_PORT=80", \
+  "-DSERVER_PORT=8080", \
   "-jar", "app.jar"]
