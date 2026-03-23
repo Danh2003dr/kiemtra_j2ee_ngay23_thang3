@@ -7,8 +7,7 @@ on:
     branches: [main]
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/lehoangdanh-courseapp
 
 jobs:
   # ── Job 1: Build & Test ──────────────────────────────────────────────────────
@@ -29,51 +28,38 @@ jobs:
 
       - name: Build & run unit tests
         run: ./mvnw -q verify
-        # Tests dùng H2 in-memory (src/test/resources/application.properties)
-        # Không cần MySQL thật
+        # Tests dùng H2 in-memory — không cần MySQL thật
 
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-jar
-          path: target/*.jar
-          retention-days: 1
-
-  # ── Job 2: Docker Build & Push ───────────────────────────────────────────────
+  # ── Job 2: Docker Build & Push (Docker Hub) ──────────────────────────────────
   docker:
-    name: Docker Build & Push (ghcr.io)
+    name: Docker Build & Push
     runs-on: ubuntu-latest
     needs: build-test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract Docker metadata (tags & labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable=true
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -82,3 +68,16 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ── Job 3: Trigger deploy webhook ────────────────────────────────────────────
+  deploy:
+    name: Deploy to server
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Call deploy webhook
+        run: |
+          curl -s -o /dev/null -w "HTTP %{http_code}" \
+            -X POST "${{ secrets.DEPLOY_URL }}"
