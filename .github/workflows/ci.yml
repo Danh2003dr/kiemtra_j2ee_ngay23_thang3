@@ -27,7 +27,9 @@ jobs:
           cache: maven
 
       - name: Build & run unit tests
-        run: ./mvnw -q verify
+        run: |
+          chmod +x mvnw
+          ./mvnw -q verify
         # Tests dùng H2 in-memory — không cần MySQL thật
 
   # ── Job 2: Docker Build & Push (Docker Hub) ──────────────────────────────────
@@ -58,6 +60,9 @@ jobs:
           tags: |
             type=raw,value=latest
             type=sha,prefix=sha-,format=short
+
+      - name: Make mvnw executable
+        run: chmod +x mvnw
 
       - name: Build and push image
         uses: docker/build-push-action@v5
