@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/lehoangdanh-courseapp
+  IMAGE_NAME: danh1432/lehoangdanh-courseapp
 
 jobs:
   # ── Job 1: Build & Test ──────────────────────────────────────────────────────
